@@ -1,0 +1,252 @@
+package com.example.batteryalarm
+
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
+import android.media.MediaPlayer
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.batteryalarm.ui.theme.BatteryAlarmTheme
+
+class MainActivity : ComponentActivity() {
+
+    private var currentMediaPlayer: MediaPlayer? = null
+    private lateinit var prefs: SharedPreferences
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        prefs = getSharedPreferences("alarm_prefs", Context.MODE_PRIVATE)
+
+        requestPermissions()
+
+        if (intent?.action == "STOP_ALARM") {
+            stopAlarm()
+        }
+
+        setContent {
+            BatteryAlarmTheme {
+                BatteryAlarmScreen(
+                    onStartMonitoring = { startMonitoring() },
+                    onStopMonitoring = { stopMonitoring() },
+                    onVolumeChanged = { volume -> saveVolume(volume) },
+                    onStopAlarm = { stopAlarm() },
+                    prefs = prefs
+                )
+            }
+        }
+    }
+
+    private fun requestPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestPermissions(
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                1001
+            )
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            requestPermissions(
+                arrayOf(Manifest.permission.SCHEDULE_EXACT_ALARM),
+                1002
+            )
+        }
+    }
+
+    private fun startMonitoring() {
+        val intent = Intent(this, com.example.batteryalarm.services.BatteryMonitorService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        prefs.edit().putBoolean("is_monitoring", true).apply()
+    }
+
+    private fun stopMonitoring() {
+        stopService(Intent(this, com.example.batteryalarm.services.BatteryMonitorService::class.java))
+        prefs.edit().putBoolean("is_monitoring", false).apply()
+    }
+
+    private fun stopAlarm() {
+        currentMediaPlayer?.stop()
+        currentMediaPlayer?.release()
+        currentMediaPlayer = null
+    }
+
+    private fun saveVolume(volume: Float) {
+        prefs.edit().putFloat("alarm_volume", volume).apply()
+    }
+}
+
+@Composable
+fun BatteryAlarmScreen(
+    onStartMonitoring: () -> Unit,
+    onStopMonitoring: () -> Unit,
+    onVolumeChanged: (Float) -> Unit,
+    onStopAlarm: () -> Unit,
+    prefs: SharedPreferences
+) {
+    var isMonitoring by remember { 
+        mutableStateOf(prefs.getBoolean("is_monitoring", false))
+    }
+    var selectedVolume by remember { 
+        mutableFloatStateOf(prefs.getFloat("alarm_volume", 0.8f))
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF5F5F5)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(24.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // Header
+            Text(
+                "Battery Alarm Monitor",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1F1F1F)
+            )
+
+            // Status Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                elevation = CardDefaults.cardElevation(4.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        "Monitoring Status",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.Gray
+                    )
+
+                    Text(
+                        if (isMonitoring) "🟢 Monitoring Active" else "🔴 Monitoring Stopped",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isMonitoring) Color(0xFF4CAF50) else Color.Red
+                    )
+
+                    Button(
+                        onClick = {
+                            isMonitoring = !isMonitoring
+                            if (isMonitoring) onStartMonitoring() else onStopMonitoring()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isMonitoring) Color(0xFFFF6B6B) else Color(0xFF4CAF50)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            if (isMonitoring) "Stop Monitoring" else "Start Monitoring",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // Volume Control Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(4.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "Alarm Volume",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.Gray
+                    )
+
+                    Slider(
+                        value = selectedVolume,
+                        onValueChange = {
+                            selectedVolume = it
+                            onVolumeChanged(it)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        valueRange = 0f..1f
+                    )
+
+                    Text(
+                        "${(selectedVolume * 100).toInt()}%",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF4CAF50)
+                    )
+                }
+            }
+
+            // Info Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(2.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F4FF))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "📱 How it works:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1F1F1F)
+                    )
+                    Text(
+                        "• Start monitoring your battery\n• App runs in background\n• Alarm sounds at 100% charge\n• Tap 'Stop Alarm' to dismiss",
+                        fontSize = 11.sp,
+                        color = Color(0xFF555555)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Stop Alarm Button
+            Button(
+                onClick = onStopAlarm,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B6B)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Stop Alarm", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
