@@ -25,12 +25,11 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Download Gradle wrapper JAR
+    - name: Download Gradle 8.4 wrapper JAR
       run: |
         mkdir -p gradle/wrapper
         cd gradle/wrapper
-        wget -q https://repo.gradle.org/gradle/gradle-8.4-bin/gradle-wrapper.jar -O gradle-wrapper.jar || \
-        curl -L https://repo.gradle.org/gradle/gradle-8.4-bin/gradle-wrapper.jar -o gradle-wrapper.jar
+        wget -q https://services.gradle.org/distributions/gradle-8.4-bin/gradle-wrapper.jar -O gradle-wrapper.jar
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
