@@ -23,17 +23,9 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-      - name: Debug Gradle Wrapper
-        run: |
-          echo "Listing current directory:"
-          ls -R
-          echo "Checking gradle-wrapper.jar size:"
-          ls -l gradle/wrapper/gradle-wrapper.jar
-
-      - name: Build with Gradle
-        run: ./gradlew assembleDebug --stacktrace -Dorg.gradle.jvmargs='-Xmx2g'
+      - name: Build with Gradle (Global)
+        # CHANGED: We use 'gradle' instead of './gradlew' to bypass the corrupted wrapper file
+        run: gradle assembleDebug --stacktrace -Dorg.gradle.jvmargs='-Xmx2g'
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
