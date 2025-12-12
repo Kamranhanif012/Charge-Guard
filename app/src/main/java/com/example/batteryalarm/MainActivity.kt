@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -35,6 +36,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        @Suppress("DEPRECATION")
+        volumeControlStream = AudioManager.STREAM_ALARM
         prefs = getSharedPreferences("alarm_prefs", Context.MODE_PRIVATE)
 
         requestPermissions()

@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
@@ -34,6 +35,8 @@ class BatteryReceiver : BroadcastReceiver() {
         try {
             // Stop previous alarm if still playing
             stopAlarm(context)
+
+            requestAudioFocus(context)
 
             val prefs = context.getSharedPreferences("alarm_prefs", Context.MODE_PRIVATE)
             val selectedToneUri = prefs.getString("selected_tone", null)
@@ -135,6 +138,7 @@ class BatteryReceiver : BroadcastReceiver() {
                 mediaPlayer?.stop()
                 mediaPlayer?.release()
                 mediaPlayer = null
+                abandonAudioFocus(context)
 
                 context?.let {
                     val notificationManager =
@@ -148,6 +152,49 @@ class BatteryReceiver : BroadcastReceiver() {
 
         fun applyVolume(volume: Float) {
             mediaPlayer?.setVolume(volume, volume)
+        }
+
+        private fun requestAudioFocus(context: Context) {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    .setOnAudioFocusChangeListener { }
+                    .build()
+                audioManager.requestAudioFocus(focusRequest)
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.requestAudioFocus(
+                    null,
+                    AudioManager.STREAM_ALARM,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                )
+            }
+        }
+
+        private fun abandonAudioFocus(context: Context?) {
+            if (context == null) return
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    .setOnAudioFocusChangeListener { }
+                    .build()
+                audioManager.abandonAudioFocusRequest(focusRequest)
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.abandonAudioFocus(null)
+            }
         }
     }
 }
