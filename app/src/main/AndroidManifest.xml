@@ -38,6 +38,10 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".receivers.AlarmStopReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>

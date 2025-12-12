@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.BatteryManager
@@ -42,11 +43,21 @@ class BatteryReceiver : BroadcastReceiver() {
                 RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             }
 
+            val safeUri = alarmUri ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(context, alarmUri)
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                setDataSource(context, safeUri)
+                isLooping = true
                 val volume = prefs.getFloat("alarm_volume", 0.8f)
                 setVolume(volume, volume)
-                isLooping = true
+                prepare() // synchronous prepare is fine for short tones
                 start()
             }
         } catch (e: Exception) {
