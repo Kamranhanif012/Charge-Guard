@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.BatteryManager
@@ -50,9 +51,11 @@ class BatteryReceiver : BroadcastReceiver() {
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )
+                // Ensure we can read picked tones (especially recordings)
+                setVolume(1f, 1f)
                 setDataSource(context, safeUri)
                 isLooping = true
                 val volume = prefs.getFloat("alarm_volume", 0.8f)
@@ -143,6 +146,10 @@ class BatteryReceiver : BroadcastReceiver() {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+
+        fun applyVolume(volume: Float) {
+            mediaPlayer?.setVolume(volume, volume)
         }
     }
 }

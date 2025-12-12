@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -60,8 +61,17 @@ class MainActivity : ComponentActivity() {
     private fun requestPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestPermissions(
-                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                arrayOf(
+                    Manifest.permission.POST_NOTIFICATIONS,
+                    Manifest.permission.READ_MEDIA_AUDIO
+                ),
                 1001
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            requestPermissions(
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
+                1003
             )
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -96,6 +106,7 @@ class MainActivity : ComponentActivity() {
 
     private fun saveVolume(volume: Float) {
         prefs.edit().putFloat("alarm_volume", volume).apply()
+        BatteryReceiver.applyVolume(volume)
     }
 
     private fun saveTone(uri: Uri, title: String?) {
