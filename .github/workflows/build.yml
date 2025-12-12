@@ -23,33 +23,11 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Prepare Gradle (download wrapper or install Gradle)
-        run: |
-          set -e
-          mkdir -p gradle/wrapper
-          echo "Trying to download gradle-wrapper.jar from Maven Central..."
-          if curl -sSfL https://repo1.maven.org/maven2/org/gradle/gradle-wrapper/8.4/gradle-wrapper-8.4.jar -o gradle/wrapper/gradle-wrapper.jar; then
-            echo "Downloaded gradle-wrapper.jar"
-          else
-            echo "gradle-wrapper.jar download failed (404 or network). Will install Gradle via SDKMAN as fallback."
-            # Install SDKMAN and Gradle (non-interactive)
-            curl -s "https://get.sdkman.io" | bash
-            export SDKMAN_DIR="$HOME/.sdkman"
-            source "$HOME/.sdkman/bin/sdkman-init.sh"
-            sdk install gradle 8.4
-          fi
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
-      - name: Make gradlew executable (if present) and build
-        run: |
-          set -e
-          if [ -f ./gradlew ]; then
-            chmod +x ./gradlew
-            echo "Using project Gradle wrapper"
-            ./gradlew assembleDebug --stacktrace -Dorg.gradle.jvmargs='-Xmx2g'
-          else
-            echo "No gradlew found — using system gradle"
-            gradle assembleDebug --stacktrace -Dorg.gradle.jvmargs='-Xmx2g'
-          fi
+      - name: Build with Gradle
+        run: ./gradlew assembleDebug --stacktrace -Dorg.gradle.jvmargs='-Xmx2g'
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
