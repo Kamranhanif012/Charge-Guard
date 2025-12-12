@@ -184,7 +184,7 @@ fun BatteryAlarmScreen(
         ) {
             // Header
             Text(
-                "Battery Alarm Monitor",
+                "Charge Guard",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF1F1F1F)
