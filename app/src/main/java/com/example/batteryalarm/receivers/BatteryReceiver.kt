@@ -15,15 +15,13 @@ import com.example.batteryalarm.MainActivity
 
 class BatteryReceiver : BroadcastReceiver() {
 
-    private var mediaPlayer: MediaPlayer? = null
-
     override fun onReceive(context: Context?, intent: Intent?) {
         if (intent?.action == Intent.ACTION_BATTERY_CHANGED && context != null) {
             val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
             val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
 
-            // Trigger alarm only when battery reaches exactly 100%
-            if (level == 100 && status == BatteryManager.BATTERY_STATUS_FULL) {
+            // Trigger alarm when battery is full or reports 100%
+            if (level >= 100 || status == BatteryManager.BATTERY_STATUS_FULL) {
                 triggerAlarm(context)
                 showAlarmNotification(context)
             }
@@ -33,8 +31,7 @@ class BatteryReceiver : BroadcastReceiver() {
     private fun triggerAlarm(context: Context) {
         try {
             // Stop previous alarm if still playing
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
+            stopAlarm(context)
 
             val prefs = context.getSharedPreferences("alarm_prefs", Context.MODE_PRIVATE)
             val selectedToneUri = prefs.getString("selected_tone", null)
@@ -117,18 +114,32 @@ class BatteryReceiver : BroadcastReceiver() {
     companion object {
         const val ALARM_CHANNEL_ID = "battery_alarm_channel"
         const val ALARM_NOTIFICATION_ID = 2
+
+        @Volatile
+        private var mediaPlayer: MediaPlayer? = null
+
+        fun stopAlarm(context: Context?) {
+            try {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+
+                context?.let {
+                    val notificationManager =
+                        it.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    notificationManager.cancel(ALARM_NOTIFICATION_ID)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }
 
 class AlarmStopReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         if (intent?.action == "STOP_ALARM_ACTION") {
-            // Signal MainActivity to stop alarm
-            val mainActivityIntent = Intent(context, MainActivity::class.java).apply {
-                action = "STOP_ALARM"
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
-            context?.startActivity(mainActivityIntent)
+            BatteryReceiver.stopAlarm(context)
         }
     }
 }

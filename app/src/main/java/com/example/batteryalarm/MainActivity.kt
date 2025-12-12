@@ -5,10 +5,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.media.MediaPlayer
+import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -21,6 +23,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.batteryalarm.ui.theme.BatteryAlarmTheme
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.net.Uri
+import com.example.batteryalarm.receivers.BatteryReceiver
+import androidx.compose.ui.platform.LocalContext
 
 class MainActivity : ComponentActivity() {
 
@@ -43,6 +49,7 @@ class MainActivity : ComponentActivity() {
                     onStartMonitoring = { startMonitoring() },
                     onStopMonitoring = { stopMonitoring() },
                     onVolumeChanged = { volume -> saveVolume(volume) },
+                    onToneSelected = { uri, title -> saveTone(uri, title) },
                     onStopAlarm = { stopAlarm() },
                     prefs = prefs
                 )
@@ -84,10 +91,18 @@ class MainActivity : ComponentActivity() {
         currentMediaPlayer?.stop()
         currentMediaPlayer?.release()
         currentMediaPlayer = null
+        BatteryReceiver.stopAlarm(this)
     }
 
     private fun saveVolume(volume: Float) {
         prefs.edit().putFloat("alarm_volume", volume).apply()
+    }
+
+    private fun saveTone(uri: Uri, title: String?) {
+        prefs.edit()
+            .putString("selected_tone", uri.toString())
+            .putString("selected_tone_title", title ?: "Custom tone")
+            .apply()
     }
 }
 
@@ -96,6 +111,7 @@ fun BatteryAlarmScreen(
     onStartMonitoring: () -> Unit,
     onStopMonitoring: () -> Unit,
     onVolumeChanged: (Float) -> Unit,
+    onToneSelected: (Uri, String?) -> Unit,
     onStopAlarm: () -> Unit,
     prefs: SharedPreferences
 ) {
@@ -104,6 +120,26 @@ fun BatteryAlarmScreen(
     }
     var selectedVolume by remember { 
         mutableFloatStateOf(prefs.getFloat("alarm_volume", 0.8f))
+    }
+    var selectedToneTitle by remember { 
+        mutableStateOf(prefs.getString("selected_tone_title", "Default alarm tone") ?: "Default alarm tone")
+    }
+
+    val context = LocalContext.current
+    val ringtonePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        }
+        if (uri != null) {
+            val title = RingtoneManager.getRingtone(context, uri)?.getTitle(context)
+            selectedToneTitle = title ?: "Custom tone"
+            onToneSelected(uri, title)
+        }
     }
 
     Box(
@@ -208,6 +244,27 @@ fun BatteryAlarmScreen(
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFF4CAF50)
                     )
+
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Tone")
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, prefs.getString("selected_tone", null)?.let { Uri.parse(it) })
+                            }
+                            ringtonePickerLauncher.launch(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.Start
+                        ) {
+                            Text("Choose Alarm Tone", fontWeight = FontWeight.Bold)
+                            Text(selectedToneTitle, fontSize = 12.sp, color = Color.Gray)
+                        }
+                    }
                 }
             }
 
