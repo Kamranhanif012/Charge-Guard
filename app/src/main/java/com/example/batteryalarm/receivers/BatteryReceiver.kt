@@ -54,8 +54,6 @@ class BatteryReceiver : BroadcastReceiver() {
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )
-                // Ensure we can read picked tones (especially recordings)
-                setVolume(1f, 1f)
                 setDataSource(context, safeUri)
                 isLooping = true
                 val volume = prefs.getFloat("alarm_volume", 0.8f)

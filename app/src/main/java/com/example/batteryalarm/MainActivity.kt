@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.media.MediaPlayer
 import android.media.RingtoneManager
-import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -140,14 +139,28 @@ fun BatteryAlarmScreen(
     val ringtonePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        val uri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        val intent = result.data
+        val uri: Uri? = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+                intent?.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                    ?: intent?.data
+            else -> intent?.data ?: @Suppress("DEPRECATION") intent?.getParcelableExtra(Intent.EXTRA_STREAM)
         }
         if (uri != null) {
+            // Persist permission so the service can read it later
+            try {
+                val flags = intent?.flags ?: 0
+                val persisted = flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                if (persisted != 0) {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                    )
+                }
+            } catch (_: Exception) { }
+
             val title = RingtoneManager.getRingtone(context, uri)?.getTitle(context)
+                ?: uri.lastPathSegment
             selectedToneTitle = title ?: "Custom tone"
             onToneSelected(uri, title)
         }
@@ -258,10 +271,11 @@ fun BatteryAlarmScreen(
 
                     OutlinedButton(
                         onClick = {
-                            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Tone")
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                                type = "audio/*"
+                                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("audio/*"))
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
                                 putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, prefs.getString("selected_tone", null)?.let { Uri.parse(it) })
                             }
                             ringtonePickerLauncher.launch(intent)
