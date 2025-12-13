@@ -1,4 +1,4 @@
-# Battery Alarm Monitor - Android App
+# Charge Guard- Android App
 
 A lightweight Android application that monitors your device's battery level and sounds an alarm when it reaches 100% to prevent overcharging.
 
